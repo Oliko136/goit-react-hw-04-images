@@ -1,4 +1,4 @@
-import { Component } from "react";
+import { useState, useEffect } from "react";
 import { Searchbar } from "../Searchbar/Searchbar";
 import { ImageGallery } from "../ImageGallery/ImageGallery";
 import { Button } from "../Button/Button";
@@ -7,78 +7,62 @@ import { Modal } from "../Modal/Modal";
 import { fetchImages } from "services/images-api";
 import styles from './App.module.css';
 
-export class App extends Component {
-  state = {
-    query: '',
-    images: [],
-    error: null,
-    status: 'idle',
-    page: 1,
-    maxPage: null,
-    modalOpen: false,
-    imageDetails: {}
-  }
+export const App = () => {
+  const [query, setQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [error, setError] = useState(null);
+  const [status, setStatus] = useState('idle');
+  const [page, setPage] = useState(1);
+  const [maxPage, setMaxPage] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [imageDetails, setImageDetails] = useState({});
 
-  async componentDidUpdate(_, prevState) {
-    const prevQuery = prevState.query;
-    const nextQuery = this.state.query;
-    const prevPage = prevState.page;
-    const nextPage = this.state.page;
-
-    if (nextPage !== prevPage || nextQuery !== prevQuery) {
-      this.setState({ status: 'pending' });
+  useEffect(() => {
+    if (!query) {
+      return
+    }
     
-      try {
-        const { hits, totalHits } = await fetchImages(nextQuery, nextPage);
+    setStatus('pending');
 
-        this.setState(({ images }) => ({
-          images: [...images, ...hits],
-          maxPage: Math.ceil(totalHits / 12 ),
-          status: 'resolved'
-        }))
+    const getImages = async () => {
+      try {
+        const { hits, totalHits } = await fetchImages(query, page);
+
+        setImages(prevImages => [...prevImages, ...hits]);
+        setMaxPage(Math.ceil(totalHits / 12));
+        setStatus('resolved');
         
       }
       catch (error) {
-        this.setState({ error: error.message, status: 'rejected' });
+        setError(error.message);
+        setStatus('rejected');
       }
     }
+
+    getImages();
+  }, [page, query])
+
+  const handleSearch = (query) => {
+    setQuery(query);
+    setImages([]);
+    setPage(1);
   }
 
-  handleSearch = (query) => {
-    this.setState({
-      query,
-      images: [],
-      page: 1
-    });
+  const loadMore = () => {
+    setPage( prevPage => prevPage + 1);
   }
 
-  loadMore = () => {
-    this.setState(({ page }) => ({page: page + 1}));
+  const showModal = ({ largeImageURL, tags }) => {
+    setModalOpen(true);
+    setImageDetails({ largeImageURL, tags });
   }
 
-  showModal = ({ largeImageURL, tags }) => {
-    this.setState({
-      modalOpen: true,
-      imageDetails: {
-        largeImageURL,
-        tags
-      }
-    }) 
+  const closeModal = () => {
+    setModalOpen(false);
+    setImageDetails({});
   }
 
-  closeModal = () => {
-    this.setState({
-      modalOpen: false,
-      imageDetails: {}
-    })
-  }
-  
-
-  render() {
-    const { handleSearch,loadMore, showModal, closeModal } = this;
-    const { query, images, error, status, page, maxPage, modalOpen, imageDetails } = this.state;
-
-    return (
+   return (
       <div className={styles.App}>
         <Searchbar onSubmit={handleSearch} />
         
@@ -97,5 +81,4 @@ export class App extends Component {
           </Modal>}
       </div>
     )
-  }
-};
+}
